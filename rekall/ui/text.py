@@ -17,6 +17,8 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #
 
+"""This module implements a text based renderer, along with helpers."""
+
 
 class TextRenderer(BaseRenderer):
     """Renderer that outputs text readable by humans and other sentients."""
