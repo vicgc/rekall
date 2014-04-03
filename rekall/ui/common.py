@@ -17,6 +17,12 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #
 
+"""Assorted helper classes, mostly for use by renderers.
+
+This module provides utility code for renderers and their helpers, and
+also sets up the UI CLI arguments.
+"""
+
 
 try:
     import curses
