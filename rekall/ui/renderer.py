@@ -17,6 +17,11 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #
 
+"""Renderers are format and print output of plugins.
+
+This module provides the abstract renderer class.
+"""
+
 
 class BaseRenderer(object):
     """All renderers inherit from this."""
