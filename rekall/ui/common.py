@@ -25,21 +25,16 @@ except Exception:  # curses sometimes raises weird exceptions.
     curses = None
 
 import logging
-import json
 import re
 import os
 import string as s
 import subprocess
 import sys
 import tempfile
-import textwrap
-import time
 
 from rekall import config
 from rekall import obj
 from rekall import utils
-from rekall import registry
-from rekall import constants
 
 
 config.DeclareOption(
