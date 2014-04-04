@@ -193,66 +193,66 @@ class EntityCache(object):
 
 
 class Entity(object):
-    """Abstraction over high-level concepts like processes and connections.
+    """Entity is an abstraction of things like Process, User or Connection.
 
-    An entity is a wrapper around two pieces of information:
-        Key Object (key_obj) - a subclass of BaseObject (usually a Struct)
-        that provides the entity with its notion of identity (i.e. /what/ the
-        entity is about) and some basic data. Key objects are so named because
-        they serve as the primary key by which entities are indexed and looked
-        up.
+    Entities are composed of an identity, like PID, username or memory address
+    of a socket, and a list of components, which are just named tuples that
+    describe the identity.
 
-        Metadata (meta) - a dictionary of arbitrary data that provides
-        contextual information about the key object, such as other objects
-        it's related to (remember, we can look up other entities using those
-        objects as keys) and any other data that was deemed important at
-        time of discovery.
+    Entities are not intended to be subclassed - they favor composition over
+    inheritance [1].
 
-    Subclasses combine information from both sources of information and present
-    a clean interface, but they should not attach more state information.
+    ### Behavior: Merging
 
-    ### Behavior - Merging
+    The only behavior defined on Entity is the 'merge' class method. If the
+    same identity is discovered twice (for example, a user is found in a list
+    of processes and in a registry key) all of the information learned about it
+    can be merged into a single entity that contains everything we know about
+    the thing.
 
-    Entities that are equal (their key objects are equal) can me merged into
-    a single entity that has both their data. See merge bellow.
+    ### Immutability
 
-    ### IMPORTANT note on relationships between entities and storing entities:
+    Entites and components are intended to be immutable, copy-on-write. This
+    is currently not enforced by this class. Altering an entity or a component
+    may lead to undefined behavior. All methods that appear to alter the entity
+    are, in reality, returning new instances.
 
-    Some entities have logical relationships of either the 1:1 (e.g. socket
-    and open file) or N:1 sort (e.g. process and open files).
+    ### Associations/Relationships
 
-    These relationships should, without exception, be expressed through the key
-    objects. For example, a Process entity should store (or lookup) a list
-    of key objects used by OpenFile entity, instead of a list of OpenFile
-    entities.
+    Some entities have components that define their relationship to other
+    entities. For example, a process has many open handles, and a connection
+    is associated with a handle.
 
-    The key object is so named because it serves as the indexing key by which
-    entities are identified, hashed, compared and merged. The per-session
-    profile object will provide an API to lookup/create entity objects from
-    key objects, so there is no reason to ever store entity objects.
+    In these cases, the components store the identity object, NOT the
+    entity(ies) they represent.
+
+    ### State/constructor arguments
+
+    identity: An object that uniquely identifies an entity. Must support
+        __hash__, __eq__, __ne__ and __unicode__.
+
+    components: All information about the identity.
+
+    collectors: A (frozen)set of collectors, which are all the ways we learned
+        information about the identity. Joined on merging.
+
+    copies_count: The number of times this identity was discovered by different
+        collectors. Incremented on merging.
+
+    ### References:
+
+    1: http://en.wikipedia.org/wiki/Composition_over_inheritance
+
+    Also see: http://en.wikipedia.org/wiki/Entity_component_system
     """
 
-    def __init__(self, key_obj, meta=None, generators=frozenset(),
-                 session=None, copies_count=1):
-        if isinstance(key_obj, obj.BaseObjectIdentity):
-            key_obj = key_obj.restore(session=session)
-
-        # Always deref pointers so we can test for equivalency.
-        if isinstance(key_obj, obj.Pointer):
-            key_obj = key_obj.dereference()
-
-        # Store identity for comparisons and quick lookups.
-        self.identity = obj.BaseObjectIdentity(base_obj=key_obj)
-
-        if meta is None:
-            meta = dict()
-
-        self.key_obj = key_obj
-        self.meta = meta
-        self.generators = generators
-        self.session = session
+    def __init__(self, identity, components, collectors=frozenset(),
+                 copies_count=1):
+        self.identity = identity
+        self.components = components
+        self.collectors = collectors
         self.copies_count = copies_count
-
+    
     def __hash__(self):
         return hash(self.identity)
 
@@ -262,131 +262,58 @@ class Entity(object):
     def __ne__(self, other):
         return not self.__eq__(other)
 
-    @classmethod
-    def merge(cls, x, y):
-        """Make a new entity with all the attributes of x and y.
+    def m(self, attr, component=None):
+        """Retrieve a property of a component.
 
-        Arguments:
-          x, y: Two entities with the same key object. x and y don't have
-          to be the exact same class as long as one is a subclass of the other.
+        Shorthand syntax:
+            entity.m("component.property")
 
-        Returns:
-          A new entity of the same class as x and y, with all the attributes
-          of both. If one entity is a subclass of the other then priority is
-          given to the subclass in both the type and the attributes of the
-          returned entity.
+        Faster:
+            entity.m("property", component="component")
+
+        It is not an error to request a property or a component that doesn't
+        exist - you will get a NoneObject.
         """
-        if x != y:
-            raise AttributeError(
-                "Cannot merge entities with different key objects.")
+        if component is None:
+            component, attr = attr.split(".")
 
-        if isinstance(x, type(y)):
-            # Either x is more specific or they're the same.
-            e1 = x
-            e2 = y
-        elif isinstance(y, type(x)):
-            e1 = y
-            e2 = x
-        else:
-            raise AttributeError(
-                "Cannot merge entities of different types.")
-
-        cls = type(e1)
-        return cls(
-            key_obj=e1.key_obj,
-            generators=e1.generators | e2.generators,
-            meta=utils.SuperpositionMerge(e2.meta, e1.meta),
-            session=e1.session,
-            copies_count=e1.copies_count + e2.copies_count,
+        component_data = self.components.get(
+            key=component,
+            default=obj.NoneObject(
+                "Entity %s has no component %s." %
+                (self, component)
+            )
         )
 
-    @property
-    def entity_name(self):
-        pass
+        return getattr(
+            object=component_data,
+            name=attr,
+            default=obj.NoneObject(
+                "Component %s has no attribute %s." %
+                (component, attr)
+            )
+        )
 
-    @property
-    def entity_type(self):
-        pass
+    def __unicode__(self):
+        return self.identity
+    
+    def __str__(self):
+        return self.__unicode__()
 
+    @classmethod
+    def merge(cls, x, y):
+        if x != y:
+            raise AttributeError(
+                "Cannot merge entities with different identities.")
 
-class Process(Entity):
-    @property
-    def pid(self):
-        pass
-
-    @property
-    def ppid(self):
-        pass
-
-    @property
-    def command(self):
-        pass
-
-
-class NetworkInterface(Entity):
-    @property
-    def addresses(self):
-        """Tuples of (protocol, address)."""
-        pass
-
-    @property
-    def interface_name(self):
-        pass
-
-    @property
-    def entity_name(self):
-        return self.interface_name
-
-
-class OpenResource(Entity):
-    @property
-    def handles(self):
-        pass
-
-
-class OpenFile(OpenResource):
-    @property
-    def full_path(self):
-        pass
-
-
-class Connection(OpenResource):
-    @property
-    def addressing_family(self):
-        pass
-
-    @property
-    def protocol(self):
-        pass
-
-    @property
-    def source(self):
-        pass
-
-    @property
-    def destination(self):
-        pass
-
-    @property
-    def state(self):
-        pass
-
-
-class OpenHandle(Entity):
-    @property
-    def resource(self):
-        pass
-
-    @property
-    def process(self):
-        pass
-
-    @property
-    def descriptor(self):
-        pass
-
-    @property
-    def flags(self):
-        pass
-
+        return Entity(
+            identity=x.identity,
+            components=utils.MergeNamedTuples(
+                x.components,
+                y.components,
+                preserving=True,
+            ),
+            copies_count=x.copies_count + y.copies_count,
+            collectors=x.collectors | y.collectors,
+        )
 
