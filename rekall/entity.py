@@ -186,7 +186,7 @@ class EntityCache(object):
         if identity in self.entities_by_identity:
             entity = Entity.merge(
                 entity,
-                self.entities_by_identity[identity]
+                self.entities_by_identity[identity],
             )
 
         self.entities_by_identity[identity] = entity
@@ -194,7 +194,7 @@ class EntityCache(object):
         for collector in entity.collectors:
             self.identities_by_collector.setdefault(
                 collector,
-                set()
+                set(),
             ).add(identity)
 
     def _collect_entities(self, component, cache_only=False):
@@ -207,7 +207,7 @@ class EntityCache(object):
         Yields:
             Entities that have the desired component.
         """
-        collectors = self.session.profile.collectors(
+        collectors = self.session.profile.get_collectors(
             component=component
         )
 

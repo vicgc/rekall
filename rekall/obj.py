@@ -1315,9 +1315,9 @@ class Profile(object):
     # This hold the executable code compiled from the vtypes above.
     types = None
 
-    # This holds the entity generators indexed by the class of entity they
-    # generate.
-    generators = None
+    # This holds all the entity collectors indexed by names of components that
+    # they produce.
+    collectors = None
 
     # This is the base class for all profiles.
     __metaclass__ = registry.MetaclassRegistry
@@ -1442,7 +1442,7 @@ class Profile(object):
 
         self.overlays = []
         self.vtypes = {}
-        self.generators = {}
+        self.collectors = {}
         self.constants = {}
         self.constant_addresses = utils.SortedCollection(key=lambda x: x[0])
         self.enums = {}
@@ -1486,7 +1486,7 @@ class Profile(object):
         # pylint: disable=protected-access
         result = self.__class__(name=self.name, session=self.session)
         result.vtypes = self.vtypes.copy()
-        result.generators = self.generators.copy()
+        result.collectors = self.collectors.copy()
         result.overlays = self.overlays[:]
         result.enums = self.enums.copy()
         result.reverse_enums = self.reverse_enums.copy()
@@ -1512,7 +1512,7 @@ class Profile(object):
         other.EnsureInitialized()
 
         self.vtypes.update(other.vtypes)
-        self.generators.update(other.generators)
+        self.collectors.update(other.collectors)
         self.overlays += other.overlays
         self.constants.update(other.constants)
         self.object_classes.update(other.object_classes)
@@ -1852,32 +1852,23 @@ class Profile(object):
         self.overlays.append(copy.deepcopy(overlay))
         self.known_types.update(overlay)
 
-    def add_generator(self, entity_cls, generator):
-        """Add a generator for a particular entity class.
+    def add_collector(self, component, collector):
+        """Add a collector for a particular entity component.
 
         Arguments:
-          generator: A Callable that takes instance of Session as argument
-          and yields instances of entity_cls.
+          collector: A Callable that takes instance of Session as argument
+            and yields tuples of (identity, components)
 
-          entity_cls: A subclass of Entity.
+          component: Call the collector when this component is requested.
         """
-        self.generators.setdefault(entity_cls, []).append(generator)
+        self.collectors.setdefault(entity_cls, []).append(generator)
 
-    def entity_generators(self, entity_cls, subclasses=True):
-        """Get generators that return a particular entity class.
-
-        Arguments:
-          subclasses (default: True): Include generators for subclasses too.
-
-        Yields:
-          Callables that take session as argument and return instances of
-          entity_cls.
-        """
-        for cls, generators in self.generators.iteritems():
-            if (entity_cls == cls
-                or (subclasses and issubclass(cls, entity_cls))):
-                for generator in generators:
-                    yield generator
+    def get_collectors(self, component):
+        """Get collectors that yield a particular component."""
+        for name, collectors in self.collectors.iteritems():
+            if component == name:
+                for collector in collectors:
+                    yield collector
 
     def _apply_type_overlay(self, type_member, overlay):
         """Update the overlay with the missing information from type.
