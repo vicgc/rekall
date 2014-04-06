@@ -288,7 +288,12 @@ class BaseObjectIdentity(object):
     original BaseObject instance using an active session.
     """
     def __init__(self, base_obj=None, obj_offset=None, obj_vm=None,
-                 obj_type=None, dtb=None):
+                 obj_type=None, dtb=None, keep_pointer=False):
+        # Always dereference pointers to prevent having the same thing appear
+        # multiple times.
+        if isinstance(base_obj, Pointer) and not keep_pointer:
+            base_obj = base_obj.dereference()
+
         if base_obj:
             obj_offset = base_obj.obj_offset
             obj_type = base_obj.obj_type

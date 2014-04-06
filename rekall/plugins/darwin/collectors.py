@@ -22,7 +22,25 @@ Darwin entity collectors are all here.
 __author__ = "Adam Sindelar <adamsh@google.com>"
 
 
-def DarwinNetworkInterfaces(profile):
+def ParseNetworkInterface(interface):
+    yield components.Named(
+        name="%s%d" % (
+            interface.if_name.deref(),
+            interface.if_unit,
+        ),
+        kind="Network Interface",
+    )
+
+    yield components.NetworkInterface(
+        addresses=[
+            (x.ifa_addr.sa_family, x.ifa_addr.deref())
+            for x
+            in interface.if_addrhead.tqh_first.walk_list("ifa_link.tqe_next")
+        ],
+    )
+
+
+def NetworkInterfaces(profile):
     """Walks the global list of interfaces.
 
     The head of the list of network interfaces is a kernel global [1].

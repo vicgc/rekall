@@ -40,3 +40,35 @@ def ParseDarwinNetworkInterface(interface):
         ],
     )
 
+
+def ParseDarwinProcess(proc):
+    yield components.Process(
+        pid=proc.pid,
+        parent_process=proc.ppid,
+        command=proc.p_comm,
+    )
+
+    yield components.Named(
+        name=proc.p_comm,
+    )
+
+
+def ParseDarwinHandle(fileproc, proc, fd, flags):
+    yield components.Handle(
+        process=proc.pid,
+        resource=fileproc.autocast_fg_data(),
+        fd=fd,
+        flags=flags,
+    )
+
+
+def ParseDarwinFile(vnode, fileproc):
+    yield components.File(
+        handle=fileproc,
+        full_path=vnode.full_path,
+    )
+
+
+def ParseDarwinSocket(socket, fileproc):
+    pass
+

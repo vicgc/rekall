@@ -17,7 +17,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 """
-Entity components live here.
+This module defines all the components that Rekall knows about.
 
 A component is a collection of properties that relate to an entity, which is
 an encapsulated notion of identity. In Rekall, components are basically just
@@ -46,25 +46,25 @@ NetworkInterface = collections.namedtuple(
 
 Process = collections.namedtuple(
     "Process",
-    ["pid", "parent_process", "user", "command", "argc", "argv"],
+    ["pid", "parent_identity", "user_identity", "command", "arguments"],
 )
 
 
 Connection = collections.namedtuple(
     "Connection",
-    ["source", "destination", "protocol", "addressing_family", "state"],
+    ["source", "destination", "protocols", "addressing_family", "state"],
 )
 
 
 Resource = collections.namedtuple(
     "Resource",
-    ["handle"],
+    ["handle_identity"],
 )
 
 
 Handle = collections.namedtuple(
     "Handle",
-    ["resource", "process", "descriptor", "flags"],
+    ["resource_identity", "process_identity", "fd", "flags"],
 )
 
 
@@ -76,6 +76,7 @@ File = collections.namedtuple(
 
 User = collections.namedtuple(
     "User",
-    ["username", "uid", "home_dir"],
+    "uid", "home_dir", "username", "real_name"],
 )
+
 
